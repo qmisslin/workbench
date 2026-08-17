@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 1,
+  "coordinateSystem": {
+    "right": "+X",
+    "up": "+Y",
+    "forward": "-Z"
+  },
+  "output": {
+    "screenWidthPx": 1400,
+    "screenHeightPx": 1050
+  },
+  "rendering": {
+    "offscreenFrameRateHz": 60
+  },
+  "stereo": {
+    "eyeDistanceM": 0.064,
+    "eyeSwap": false
+  },
+  "camera": {
+    "nearM": 0.05,
+    "farM": 100
+  },
+  "head": {
+    "positionM": [
+      0,
+      0,
+      0
+    ]
+  },
+  "screens": {
+    "up": {
+      "widthM": 1.8,
+      "heightM": 1.35,
+      "centerM": [
+        0,
+        0.282,
+        -0.566
+      ],
+      "pitchDeg": 0
+    },
+    "down": {
+      "widthM": 1.8,
+      "heightM": 1.35,
+      "centerM": [
+        0,
+        -0.51,
+        0.098
+      ],
+      "pitchDeg": -80
+    }
+  }
+}

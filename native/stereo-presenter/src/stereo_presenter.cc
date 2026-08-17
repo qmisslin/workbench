@@ -1,3 +1,4 @@
+#include "diagnostics.h"
 #include "nvapi_probe.h"
 #include <napi.h>
 
@@ -16,7 +17,6 @@
 #include <sstream>
 #include <string>
 #include <thread>
-#include <vector>
 
 using Microsoft::WRL::ComPtr;
 
@@ -46,258 +46,6 @@ namespace
         << static_cast<unsigned long>(result);
 
     return stream.str();
-  }
-
-  void writeConsoleLine(
-      const std::string &text)
-  {
-    HANDLE output =
-        GetStdHandle(
-            STD_OUTPUT_HANDLE);
-
-    if (
-        !output ||
-        output == INVALID_HANDLE_VALUE)
-    {
-      return;
-    }
-
-    const std::string line =
-        text + "\r\n";
-
-    DWORD written =
-        0;
-
-    WriteFile(
-        output,
-        line.data(),
-        static_cast<DWORD>(
-            line.size()),
-        &written,
-        nullptr);
-  }
-
-  void probeDxgiStereo(
-      IDXGIAdapter *adapter,
-      IDXGIFactory2 *factory)
-  {
-    writeConsoleLine(
-        "DXGI stereo probe");
-
-    if (
-        !adapter ||
-        !factory)
-    {
-      writeConsoleLine(
-          "DXGI stereo probe failed: invalid adapter or factory");
-
-      return;
-    }
-
-    const BOOL windowedStereoEnabled =
-        factory->IsWindowedStereoEnabled();
-
-    writeConsoleLine(
-        std::string(
-            "Windowed stereo enabled: ") +
-        (windowedStereoEnabled
-             ? "yes"
-             : "no"));
-
-    UINT outputIndex =
-        0;
-
-    UINT totalStereoModes =
-        0;
-
-    while (true)
-    {
-      ComPtr<IDXGIOutput> output;
-
-      HRESULT result =
-          adapter->EnumOutputs(
-              outputIndex,
-              &output);
-
-      if (
-          result ==
-          DXGI_ERROR_NOT_FOUND)
-      {
-        break;
-      }
-
-      if (FAILED(result))
-      {
-        writeConsoleLine(
-            "Output enumeration failed: " +
-            formatHResult(result));
-
-        break;
-      }
-
-      DXGI_OUTPUT_DESC outputDescription = {};
-
-      result =
-          output->GetDesc(
-              &outputDescription);
-
-      if (SUCCEEDED(result))
-      {
-        std::ostringstream stream;
-
-        stream
-            << "Output "
-            << outputIndex
-            << " desktop: "
-            << outputDescription.DesktopCoordinates.left
-            << ","
-            << outputDescription.DesktopCoordinates.top
-            << " -> "
-            << outputDescription.DesktopCoordinates.right
-            << ","
-            << outputDescription.DesktopCoordinates.bottom
-            << " | attached: "
-            << (outputDescription.AttachedToDesktop
-                    ? "yes"
-                    : "no");
-
-        writeConsoleLine(
-            stream.str());
-      }
-
-      ComPtr<IDXGIOutput1> output1;
-
-      result =
-          output.As(
-              &output1);
-
-      if (FAILED(result))
-      {
-        writeConsoleLine(
-            "Output " +
-            std::to_string(outputIndex) +
-            " does not expose IDXGIOutput1");
-
-        outputIndex++;
-
-        continue;
-      }
-
-      UINT modeCount =
-          0;
-
-      /*
-       * DXGI_ENUM_MODES_STEREO asks DXGI to include stereo-capable display
-       * modes in addition to the normal mono modes.
-       */
-      result =
-          output1->GetDisplayModeList1(
-              DXGI_FORMAT_B8G8R8A8_UNORM,
-              DXGI_ENUM_MODES_STEREO,
-              &modeCount,
-              nullptr);
-
-      if (FAILED(result))
-      {
-        writeConsoleLine(
-            "Output " +
-            std::to_string(outputIndex) +
-            " mode enumeration failed: " +
-            formatHResult(result));
-
-        outputIndex++;
-
-        continue;
-      }
-
-      std::vector<DXGI_MODE_DESC1> modes(
-          modeCount);
-
-      if (modeCount > 0)
-      {
-        result =
-            output1->GetDisplayModeList1(
-                DXGI_FORMAT_B8G8R8A8_UNORM,
-                DXGI_ENUM_MODES_STEREO,
-                &modeCount,
-                modes.data());
-
-        if (FAILED(result))
-        {
-          writeConsoleLine(
-              "Output " +
-              std::to_string(outputIndex) +
-              " mode retrieval failed: " +
-              formatHResult(result));
-
-          outputIndex++;
-
-          continue;
-        }
-      }
-
-      UINT stereoModeCount =
-          0;
-
-      for (
-          UINT index = 0;
-          index < modeCount;
-          ++index)
-      {
-        const DXGI_MODE_DESC1 &mode =
-            modes[index];
-
-        if (!mode.Stereo)
-        {
-          continue;
-        }
-
-        stereoModeCount++;
-        totalStereoModes++;
-
-        double refreshRate =
-            0.0;
-
-        if (
-            mode.RefreshRate.Denominator !=
-            0)
-        {
-          refreshRate =
-              static_cast<double>(
-                  mode.RefreshRate.Numerator) /
-              static_cast<double>(
-                  mode.RefreshRate.Denominator);
-        }
-
-        std::ostringstream stream;
-
-        stream
-            << "Output "
-            << outputIndex
-            << " stereo mode: "
-            << mode.Width
-            << "x"
-            << mode.Height
-            << " @ "
-            << refreshRate
-            << " Hz";
-
-        writeConsoleLine(
-            stream.str());
-      }
-
-      writeConsoleLine(
-          "Output " +
-          std::to_string(outputIndex) +
-          " stereo modes: " +
-          std::to_string(stereoModeCount));
-
-      outputIndex++;
-    }
-
-    writeConsoleLine(
-        "Total DXGI stereo modes: " +
-        std::to_string(totalStereoModes));
   }
 
   LRESULT CALLBACK outputWindowProcedure(
@@ -1292,15 +1040,6 @@ namespace
       }
 
       /*
-      * Query stereo capabilities without changing the current presentation
-      * configuration.
-      */
-      probeDxgiStereo(
-        adapter.Get(),
-        factory.Get()
-      );
-
-      /*
        * Disable the default DXGI Alt+Enter fullscreen behavior.
        */
       result =
@@ -1992,6 +1731,10 @@ namespace
         Napi::Function::New(
             env,
             shutdown));
+
+    AttachDiagnosticsExports(
+        env,
+        exports);
 
     return exports;
   }

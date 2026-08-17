@@ -4,7 +4,8 @@
       "target_name": "stereo_presenter",
       "sources": [
         "src/stereo_presenter.cc",
-        "src/nvapi_probe.cc"
+        "src/nvapi_probe.cc",
+        "src/diagnostics.cc"
       ],
       "include_dirs": [
         "<!@(node -p \"require('node-addon-api').include\")",

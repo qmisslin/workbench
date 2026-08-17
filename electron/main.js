@@ -6,11 +6,14 @@ const {
 const path =
   require('node:path');
 
+const WORKBENCH_CONFIG =
+  require('../config/workbench.json');
+
 const SCREEN_WIDTH =
-  1400;
+  WORKBENCH_CONFIG.output.screenWidthPx;
 
 const SCREEN_HEIGHT =
-  1050;
+  WORKBENCH_CONFIG.output.screenHeightPx;
 
 const PACKED_WIDTH =
   SCREEN_WIDTH * 2;
@@ -18,14 +21,27 @@ const PACKED_WIDTH =
 const PACKED_HEIGHT =
   SCREEN_HEIGHT * 2;
 
+const OFFSCREEN_FRAME_RATE =
+  WORKBENCH_CONFIG.rendering.offscreenFrameRateHz;
+
+const DIAGNOSTICS_SAMPLE_FRAMES =
+  120;
+
+const isDiagnostics =
+  process.argv.includes('--diagnostics');
+
 const isOffscreen =
-  process.argv.includes('--offscreen');
+  process.argv.includes('--offscreen') ||
+  isDiagnostics;
 
 let mainWindow =
   null;
 
 let stereoPresenter =
   null;
+
+let diagnosticsPrinted =
+  false;
 
 function getIndexPath() {
   return path.join(
@@ -36,11 +52,235 @@ function getIndexPath() {
   );
 }
 
+function formatHz(value) {
+  if (
+    typeof value !== 'number' ||
+    !Number.isFinite(value) ||
+    value <= 0
+  ) {
+    return 'unknown';
+  }
+
+  return `${value.toFixed(2)} Hz`;
+}
+
+function formatBooleanStatus(
+  value,
+  status
+) {
+  if (
+    typeof value ===
+    'boolean'
+  ) {
+    return [
+      value
+        ? 'yes'
+        : 'no',
+      status
+        ? `(${status})`
+        : ''
+    ]
+      .filter(Boolean)
+      .join(' ');
+  }
+
+  return status || 'unavailable';
+}
+
+function formatDiagnosticsReport(
+  systemDiagnostics,
+  stats
+) {
+  const lines = [
+    '=== Workbench diagnostics ==='
+  ];
+
+  const nvapi =
+    systemDiagnostics.nvapi || {};
+
+  const dxgi =
+    systemDiagnostics.dxgi || {};
+
+  const outputs =
+    Array.isArray(dxgi.outputs)
+      ? dxgi.outputs
+      : [];
+
+  const nvapiGpus =
+    Array.isArray(nvapi.gpus)
+      ? nvapi.gpus
+      : [];
+
+  const dxgiGpus = [
+    ...new Set(
+      outputs
+        .map(
+          (output) =>
+            output.adapterName
+        )
+        .filter(Boolean)
+    )
+  ];
+
+  const gpuNames =
+    nvapiGpus.length > 0
+      ? nvapiGpus
+      : dxgiGpus;
+
+  lines.push(
+    `GPU: ${gpuNames.length > 0
+      ? gpuNames.join(', ')
+      : 'unknown'
+    }`
+  );
+
+  lines.push(
+    `NVAPI interface: ${nvapi.interfaceVersion ||
+    nvapi.interfaceStatus ||
+    'unknown'
+    }`
+  );
+
+  lines.push(
+    `NVAPI stereo enabled: ${formatBooleanStatus(
+      nvapi.stereoEnabled,
+      nvapi.stereoEnabledStatus
+    )}`
+  );
+
+  lines.push(
+    `NVAPI windowed stereo supported: ${formatBooleanStatus(
+      nvapi.windowedStereoSupported,
+      nvapi.windowedStereoSupportedStatus
+    )}`
+  );
+
+  lines.push(
+    `DXGI windowed stereo enabled: ${formatBooleanStatus(
+      dxgi.windowedStereoEnabled,
+      dxgi.factory2Status
+    )}`
+  );
+
+  lines.push(
+    `Outputs: ${outputs.length}`
+  );
+
+  for (
+    const output of outputs
+  ) {
+    const refresh =
+      formatHz(
+        output.currentRefreshHz
+      );
+
+    lines.push(
+      [
+        `Output ${output.index}:`,
+        output.deviceName || 'unknown',
+        '|',
+        `${output.currentWidth || 0}x${output.currentHeight || 0}`,
+        '@',
+        refresh,
+        '| desktop',
+        `${output.left || 0},${output.top || 0}`,
+        '->',
+        `${output.right || 0},${output.bottom || 0}`,
+        '| adapter',
+        output.adapterName || 'unknown'
+      ].join(' ')
+    );
+
+    lines.push(
+      `  DXGI stereo modes: ${output.stereoModeCount || 0
+      } | query: ${output.stereoQueryStatus ||
+      'unknown'
+      }`
+    );
+
+    const stereoModes =
+      Array.isArray(
+        output.stereoModes
+      )
+        ? output.stereoModes
+        : [];
+
+    const modesToPrint =
+      stereoModes.slice(
+        0,
+        8
+      );
+
+    for (
+      const mode of modesToPrint
+    ) {
+      lines.push(
+        `    ${mode.width}x${mode.height} @ ${formatHz(
+          mode.refreshHz
+        )}`
+      );
+    }
+
+    if (
+      stereoModes.length >
+      modesToPrint.length
+    ) {
+      lines.push(
+        `    ... ${stereoModes.length -
+        modesToPrint.length
+        } more`
+      );
+    }
+  }
+
+  lines.push(
+    [
+      'Presentation:',
+      `submitted=${stats.frameCount}`,
+      `pairs=${stats.presentedStereoPairCount}`,
+      `eyes=${stats.presentedSubframeCount}`,
+      `rate=${formatHz(stats.presentRateHz)}`
+    ].join(' | ')
+  );
+
+  lines.push(
+    [
+      'Packed texture:',
+      `${stats.width}x${stats.height}`,
+      `DXGI format=${stats.format}`
+    ].join(' ')
+  );
+
+  lines.push(
+    `Native output: ${stats.outputWidth}x${stats.outputHeight}`
+  );
+
+  lines.push(
+    [
+      'Calibration:',
+      'config/workbench.json',
+      '| tile',
+      `${SCREEN_WIDTH}x${SCREEN_HEIGHT}`,
+      '| eye distance',
+      `${(
+        WORKBENCH_CONFIG.stereo.eyeDistanceM *
+        1000
+      ).toFixed(1)} mm`
+    ].join(' ')
+  );
+
+  lines.push(
+    '=== End diagnostics ==='
+  );
+
+  return lines.join('\n');
+}
+
 function createPreviewWindow() {
   mainWindow =
     new BrowserWindow({
-      width: 1400,
-      height: 1050,
+      width: SCREEN_WIDTH,
+      height: SCREEN_HEIGHT,
       useContentSize: true,
       autoHideMenuBar: true,
       backgroundColor: '#000000',
@@ -53,24 +293,21 @@ function createPreviewWindow() {
       }
     });
 
-  /*
-  * Force the Chromium content surface to match the packed stereo texture.
-  *
-  * The native presenter expects:
-  *
-  * 2800 x 2100
-  *
-  * [ LEFT 1400 x 2100 | RIGHT 1400 x 2100 ]
-  */
   mainWindow.setContentSize(
     PACKED_WIDTH,
     PACKED_HEIGHT
   );
 
-  const [windowWidth, windowHeight] =
+  const [
+    windowWidth,
+    windowHeight
+  ] =
     mainWindow.getSize();
 
-  const [contentWidth, contentHeight] =
+  const [
+    contentWidth,
+    contentHeight
+  ] =
     mainWindow.getContentSize();
 
   console.log(
@@ -87,66 +324,34 @@ function createPreviewWindow() {
 }
 
 function createOffscreenWindow() {
-  /*
-   * The native module is loaded inside Electron's main process.
-   *
-   * No secondary executable is started.
-   */
   stereoPresenter =
     require('stereo-presenter');
 
   const initialization =
     stereoPresenter.initialize();
 
-  console.log(
-    'Native stereo presenter initialized'
-  );
+  if (!isDiagnostics) {
+    console.log(
+      'Native stereo presenter initialized'
+    );
 
-  console.log(
-    `D3D feature level: ${initialization.featureLevel}`
-  );
+    console.log(
+      `D3D feature level: ${initialization.featureLevel}`
+    );
+  }
 
   mainWindow =
     new BrowserWindow({
       x: 0,
       y: 0,
 
-      /*
-       * The hidden Chromium surface must match the packed stereo texture:
-       *
-       * 2800 x 2100
-       *
-       * [ LEFT 1400 x 2100 | RIGHT 1400 x 2100 ]
-       */
       width: PACKED_WIDTH,
       height: PACKED_HEIGHT,
 
-      /*
-       * Width and height describe the web content area directly.
-       */
       useContentSize: true,
-
-      /*
-       * The offscreen renderer does not need any native window decoration.
-       */
       frame: false,
-
-      /*
-       * The window is never shown.
-       *
-       * Chromium still renders into the offscreen shared GPU texture.
-       */
       show: false,
-
-      /*
-       * Prevent Electron from resizing the hidden rendering surface.
-       */
       resizable: false,
-
-      /*
-       * Allow the hidden rendering surface to exceed the dimensions of the
-       * physical display attached to the development computer.
-       */
       enableLargerThanScreen: true,
 
       webPreferences: {
@@ -163,27 +368,32 @@ function createOffscreenWindow() {
       }
     });
 
-  /*
-   * Explicitly enforce the Chromium content surface size.
-   */
   mainWindow.setContentSize(
     PACKED_WIDTH,
     PACKED_HEIGHT
   );
 
-  const [windowWidth, windowHeight] =
-    mainWindow.getSize();
+  if (!isDiagnostics) {
+    const [
+      windowWidth,
+      windowHeight
+    ] =
+      mainWindow.getSize();
 
-  const [contentWidth, contentHeight] =
-    mainWindow.getContentSize();
+    const [
+      contentWidth,
+      contentHeight
+    ] =
+      mainWindow.getContentSize();
 
-  console.log(
-    `Electron window size: ${windowWidth}x${windowHeight}`
-  );
+    console.log(
+      `Electron window size: ${windowWidth}x${windowHeight}`
+    );
 
-  console.log(
-    `Electron content size: ${contentWidth}x${contentHeight}`
-  );
+    console.log(
+      `Electron content size: ${contentWidth}x${contentHeight}`
+    );
+  }
 
   let firstFrame =
     true;
@@ -198,13 +408,31 @@ function createOffscreenWindow() {
         return;
       }
 
+      if (
+        !stereoPresenter ||
+        (
+          isDiagnostics &&
+          diagnosticsPrinted
+        )
+      ) {
+        texture.release();
+
+        return;
+      }
+
+      let quitAfterPaint =
+        false;
+
       try {
         const result =
           stereoPresenter.submitTexture(
             texture.textureInfo
           );
 
-        if (firstFrame) {
+        if (
+          firstFrame &&
+          !isDiagnostics
+        ) {
           console.log(
             'Shared texture successfully imported into D3D11'
           );
@@ -220,12 +448,39 @@ function createOffscreenWindow() {
           console.log(
             `DXGI format: ${result.format}`
           );
+        }
 
-          firstFrame =
-            false;
+        firstFrame =
+          false;
+
+        if (
+          isDiagnostics &&
+          !diagnosticsPrinted &&
+          result.frameCount >=
+          DIAGNOSTICS_SAMPLE_FRAMES
+        ) {
+          const systemDiagnostics =
+            stereoPresenter.getSystemDiagnostics();
+
+          const stats =
+            stereoPresenter.getStats();
+
+          console.log(
+            formatDiagnosticsReport(
+              systemDiagnostics,
+              stats
+            )
+          );
+
+          diagnosticsPrinted =
+            true;
+
+          quitAfterPaint =
+            true;
         }
 
         if (
+          !isDiagnostics &&
           result.frameCount % 300 ===
           0
         ) {
@@ -247,25 +502,21 @@ function createOffscreenWindow() {
           error
         );
       } finally {
-        /*
-         * The native module has copied the frame into its own D3D11
-         * texture before submitTexture() returns.
-         *
-         * Chromium's texture can now be returned to Electron's pool.
-         */
         texture.release();
+
+        if (quitAfterPaint) {
+          setImmediate(
+            () => {
+              app.quit();
+            }
+          );
+        }
       }
     }
   );
 
-  /*
-   * Three.js currently produces complete stereo pairs at 60 Hz.
-   *
-   * The later native presenter will independently present left/right
-   * images at the physical stereo refresh rate.
-   */
   mainWindow.webContents.setFrameRate(
-    60
+    OFFSCREEN_FRAME_RATE
   );
 
   mainWindow.loadFile(
@@ -273,13 +524,15 @@ function createOffscreenWindow() {
   );
 }
 
-app.whenReady().then(() => {
-  if (isOffscreen) {
-    createOffscreenWindow();
-  } else {
-    createPreviewWindow();
+app.whenReady().then(
+  () => {
+    if (isOffscreen) {
+      createOffscreenWindow();
+    } else {
+      createPreviewWindow();
+    }
   }
-});
+);
 
 app.on(
   'before-quit',
