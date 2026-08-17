@@ -8,3 +8,6 @@ out/
 Thumbs.db
 
 .vscode/
+
+native/stereo-presenter/build/
+out.txt

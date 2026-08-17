@@ -1,0 +1,20 @@
+{
+  "name": "stereo-presenter",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Native D3D11 stereo presentation backend for Workbench.",
+  "main": "index.js",
+  "gypfile": true,
+  "os": [
+    "win32"
+  ],
+  "cpu": [
+    "x64"
+  ],
+  "scripts": {
+    "install": "node -e \"console.log('Native build deferred to @electron/rebuild')\""
+  },
+  "dependencies": {
+    "node-addon-api": "8.9.1"
+  }
+}

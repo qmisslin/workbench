@@ -1,19 +1,28 @@
 {
   "name": "workbench",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "Electron and Three.js renderer for the laboratory workbench.",
   "main": "electron/main.js",
   "scripts": {
-    "build": "vite build",
+    "build:web": "vite build",
+    "rebuild:native": "electron-rebuild -f -w stereo-presenter",
+    "build": "npm run build:web && npm run rebuild:native",
     "start": "npm run build && electron .",
     "preview": "npm run build && electron .",
-    "offscreen": "npm run build && electron . --offscreen"
+    "offscreen": "npm run build && electron . --offscreen",
+    "package": "npm run build:web && electron-forge package",
+    "make": "npm run build:web && electron-forge make"
   },
   "dependencies": {
+    "stereo-presenter": "file:./native/stereo-presenter",
     "three": "latest"
   },
   "devDependencies": {
+    "@electron-forge/cli": "latest",
+    "@electron-forge/maker-zip": "latest",
+    "@electron-forge/plugin-auto-unpack-natives": "latest",
+    "@electron/rebuild": "latest",
     "electron": "latest",
     "vite": "latest"
   }

@@ -1,0 +1,3 @@
+[submodule "native/stereo-presenter/vendor/nvapi"]
+	path = native/stereo-presenter/vendor/nvapi
+	url = https://github.com/NVIDIA/nvapi.git
