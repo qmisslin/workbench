@@ -22,7 +22,7 @@ The internal framebuffer layout is:
 
 ```text
 +--------------------+--------------------+
-| UP LEFT 1400x1050  | UP RIGHT 1400x1050|
+| UP LEFT 1400x1050  | UP RIGHT 1400x1050 |
 +--------------------+--------------------+
 | DOWN LEFT          | DOWN RIGHT         |
 | 1400x1050          | 1400x1050          |
