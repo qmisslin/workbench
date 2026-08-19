@@ -20,12 +20,14 @@ The application renders a calibrated dual-display scene in Three.js and uses a n
 
 The internal framebuffer layout is:
 
+```text
 +--------------------+--------------------+
 | UP LEFT 1400x1050  | UP RIGHT 1400x1050 |
 +--------------------+--------------------+
 | DOWN LEFT          | DOWN RIGHT         |
 | 1400x1050          | 1400x1050          |
 +--------------------+--------------------+
+```
 
 The side-by-side layout is only used as an internal GPU transport format. It is never intended to be displayed directly on the physical Workbench screens.
 
