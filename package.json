@@ -12,10 +12,12 @@
     "preview": "npm run build && electron .",
     "offscreen": "npm run build && electron . --offscreen",
     "diagnostics": "npm run build && electron . --diagnostics",
+    "tracking:debug": "npm run build && electron . --offscreen --tracking-debug",
     "package": "npm run build:web && electron-forge package",
     "make": "npm run build:web && electron-forge make"
   },
   "dependencies": {
+    "@mediapipe/tasks-vision": "1.0.1",
     "stereo-presenter": "file:./native/stereo-presenter",
     "three": "latest"
   },

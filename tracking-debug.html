@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0"
+    />
+    <title>Workbench Tracking Debug</title>
+  </head>
+
+  <body>
+    <main class="tracking-debug">
+      <section class="camera-panel">
+        <div class="camera-stage">
+          <video
+            id="camera-video"
+            autoplay
+            muted
+            playsinline
+          ></video>
+
+          <canvas
+            id="tracking-overlay"
+          ></canvas>
+        </div>
+      </section>
+
+      <aside class="debug-panel">
+        <h1>Workbench Tracking</h1>
+
+        <section class="status-grid">
+          <div class="status-row">
+            <span>camera</span>
+            <strong id="status-camera">loading</strong>
+          </div>
+
+          <div class="status-row">
+            <span>opencv</span>
+            <strong id="status-opencv">idle</strong>
+          </div>
+
+          <div class="status-row">
+            <span>aruco</span>
+            <strong id="status-aruco">idle</strong>
+          </div>
+
+          <div class="status-row">
+            <span>mediapipe</span>
+            <strong id="status-mediapipe">idle</strong>
+          </div>
+
+          <div class="status-row">
+            <span>hands</span>
+            <strong id="status-hands">idle</strong>
+          </div>
+
+          <div class="status-row">
+            <span>pose</span>
+            <strong id="status-pose">idle</strong>
+          </div>
+
+          <div class="status-row">
+            <span>loop</span>
+            <strong id="status-loop">idle</strong>
+          </div>
+        </section>
+
+        <section class="debug-section">
+          <h2>Camera</h2>
+          <pre id="camera-info">waiting</pre>
+        </section>
+
+        <section class="debug-section">
+          <h2>Marker</h2>
+          <pre id="marker-info">waiting</pre>
+        </section>
+
+        <section class="debug-section">
+          <h2>Hands</h2>
+          <pre id="hands-info">waiting</pre>
+        </section>
+
+        <section class="debug-section">
+          <h2>Body</h2>
+          <pre id="body-info">waiting</pre>
+        </section>
+
+        <section class="debug-section">
+          <h2>Timings</h2>
+          <pre id="timings-info">waiting</pre>
+        </section>
+
+        <details class="debug-section">
+          <summary>TrackingState</summary>
+          <pre id="tracking-state-json">waiting</pre>
+        </details>
+      </aside>
+    </main>
+
+    <script
+      type="module"
+      src="/src/tracking-debug.js"
+    ></script>
+  </body>
+</html>

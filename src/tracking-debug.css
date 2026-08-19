@@ -1,0 +1,148 @@
+:root {
+  font-family: Consolas, "Courier New", monospace;
+  color: #f4f4f4;
+  background: #111111;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+body {
+  background: #111111;
+}
+
+.tracking-debug {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 420px;
+  width: 100%;
+  height: 100%;
+}
+
+.camera-panel {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: #000000;
+}
+
+.camera-stage {
+  position: relative;
+  width: 100%;
+  max-width: 100%;
+  max-height: 100%;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  background: #050505;
+}
+
+#camera-video,
+#tracking-overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+#tracking-overlay {
+  pointer-events: none;
+}
+
+.debug-panel {
+  min-width: 0;
+  overflow: auto;
+  padding: 16px;
+  border-left: 1px solid #333333;
+  background: #171717;
+}
+
+h1,
+h2 {
+  margin: 0;
+  font-weight: 600;
+}
+
+h1 {
+  margin-bottom: 16px;
+  font-size: 20px;
+}
+
+h2 {
+  margin-bottom: 8px;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #bbbbbb;
+}
+
+.status-grid {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 18px;
+}
+
+.status-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 9px;
+  border: 1px solid #333333;
+  background: #202020;
+}
+
+.status-row strong {
+  text-align: right;
+}
+
+.status-idle {
+  color: #aaaaaa;
+}
+
+.status-loading,
+.status-starting {
+  color: #e0c46c;
+}
+
+.status-ready,
+.status-running {
+  color: #7bd88f;
+}
+
+.status-failed {
+  color: #ff7b72;
+}
+
+.debug-section {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid #333333;
+}
+
+pre {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.45;
+  color: #dddddd;
+}
+
+summary {
+  cursor: pointer;
+  margin-bottom: 10px;
+  color: #bbbbbb;
+}

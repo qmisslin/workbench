@@ -48,5 +48,68 @@
       ],
       "pitchDeg": -80
     }
+  },
+  "tracking": {
+    "processingFps": 15,
+    "debugWindow": {
+      "widthPx": 1400,
+      "heightPx": 900
+    },
+    "camera": {
+      "deviceId": null,
+      "widthPx": 1280,
+      "heightPx": 720,
+      "frameRateHz": 30
+    },
+    "opencv": {
+      "assetPath": "opencv/opencv.js",
+      "dictionary": "DICT_4X4_50",
+      "markerId": 0,
+      "markerSizeM": null,
+      "axisLengthM": 0.05,
+      "intrinsics": {
+        "imageWidthPx": null,
+        "imageHeightPx": null,
+        "fx": null,
+        "fy": null,
+        "cx": null,
+        "cy": null,
+        "distCoeffs": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    "mediapipe": {
+      "wasm": {
+        "simdLoaderAssetPath": "mediapipe/wasm/vision_wasm_internal.js",
+        "simdBinaryAssetPath": "mediapipe/wasm/vision_wasm_internal.wasm",
+        "noSimdLoaderAssetPath": "mediapipe/wasm/vision_wasm_nosimd_internal.js",
+        "noSimdBinaryAssetPath": "mediapipe/wasm/vision_wasm_nosimd_internal.wasm"
+      },
+      "handModelAssetPath": "models/hand_landmarker.task",
+      "poseModelAssetPath": "models/pose_landmarker_lite.task",
+      "delegate": "CPU",
+      "numHands": 2,
+      "numPoses": 1,
+      "minHandDetectionConfidence": 0.5,
+      "minHandPresenceConfidence": 0.5,
+      "minHandTrackingConfidence": 0.5,
+      "minPoseDetectionConfidence": 0.5,
+      "minPosePresenceConfidence": 0.5,
+      "minPoseTrackingConfidence": 0.5,
+      "swapHandedness": true
+    },
+    "cameraToWorkbench": {
+      "calibrated": false,
+      "matrixRowMajor": null
+    },
+    "markerToEyes": {
+      "leftEyeM": null,
+      "rightEyeM": null
+    }
   }
 }

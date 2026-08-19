@@ -1,7 +1,11 @@
 const {
   app,
-  BrowserWindow
+  BrowserWindow,
+  ipcMain
 } = require('electron/main');
+
+const fs =
+  require('node:fs/promises');
 
 const path =
   require('node:path');
@@ -27,8 +31,19 @@ const OFFSCREEN_FRAME_RATE =
 const DIAGNOSTICS_SAMPLE_FRAMES =
   120;
 
+const TRACKING_ASSET_ROOT =
+  path.resolve(
+    __dirname,
+    '..',
+    'dist',
+    'tracking'
+  );
+
 const isDiagnostics =
   process.argv.includes('--diagnostics');
+
+const isTrackingDebug =
+  process.argv.includes('--tracking-debug');
 
 const isOffscreen =
   process.argv.includes('--offscreen') ||
@@ -37,11 +52,44 @@ const isOffscreen =
 let mainWindow =
   null;
 
+let trackingWindow =
+  null;
+
 let stereoPresenter =
   null;
 
 let diagnosticsPrinted =
   false;
+
+let latestTrackingState = {
+  timestampMs: 0,
+  sequence: 0,
+
+  viewer: {
+    tracked: false,
+    calibrated: false,
+    transform: null,
+    leftEye: null,
+    rightEye: null
+  },
+
+  body: {
+    tracked: false,
+    imageLandmarks: [],
+    worldLandmarks: [],
+    workbenchLandmarks: null
+  },
+
+  hands: {
+    left: {
+      tracked: false
+    },
+    right: {
+      tracked: false
+    },
+    unassigned: []
+  }
+};
 
 function getIndexPath() {
   return path.join(
@@ -51,6 +99,179 @@ function getIndexPath() {
     'index.html'
   );
 }
+
+function getTrackingDebugPath() {
+  return path.join(
+    __dirname,
+    '..',
+    'dist',
+    'tracking-debug.html'
+  );
+}
+
+function getWorkbenchPreloadPath() {
+  return path.join(
+    __dirname,
+    'workbench-preload.js'
+  );
+}
+
+function getTrackingPreloadPath() {
+  return path.join(
+    __dirname,
+    'tracking-preload.js'
+  );
+}
+
+function isTrackingSender(event) {
+  return (
+    trackingWindow &&
+    !trackingWindow.isDestroyed() &&
+    event.sender ===
+      trackingWindow.webContents
+  );
+}
+
+function resolveTrackingAsset(
+  assetPath
+) {
+  if (
+    typeof assetPath !== 'string' ||
+    assetPath.length === 0
+  ) {
+    throw new TypeError(
+      'Tracking asset path must be a non-empty string.'
+    );
+  }
+
+  if (
+    path.isAbsolute(
+      assetPath
+    )
+  ) {
+    throw new Error(
+      'Absolute tracking asset paths are not allowed.'
+    );
+  }
+
+  const resolvedPath =
+    path.resolve(
+      TRACKING_ASSET_ROOT,
+      assetPath
+    );
+
+  const allowedPrefix =
+    `${TRACKING_ASSET_ROOT}${path.sep}`;
+
+  if (
+    resolvedPath !==
+      TRACKING_ASSET_ROOT &&
+    !resolvedPath.startsWith(
+      allowedPrefix
+    )
+  ) {
+    throw new Error(
+      'Tracking asset path escapes the tracking asset directory.'
+    );
+  }
+
+  return resolvedPath;
+}
+
+ipcMain.handle(
+  'workbench:get-config',
+  () => WORKBENCH_CONFIG
+);
+
+ipcMain.handle(
+  'workbench:get-tracking-state',
+  () => latestTrackingState
+);
+
+ipcMain.handle(
+  'workbench:read-tracking-text-asset',
+  async (
+    event,
+    assetPath
+  ) => {
+    if (
+      !isTrackingSender(
+        event
+      )
+    ) {
+      throw new Error(
+        'Tracking asset access denied.'
+      );
+    }
+
+    return fs.readFile(
+      resolveTrackingAsset(
+        assetPath
+      ),
+      'utf8'
+    );
+  }
+);
+
+ipcMain.handle(
+  'workbench:read-tracking-binary-asset',
+  async (
+    event,
+    assetPath
+  ) => {
+    if (
+      !isTrackingSender(
+        event
+      )
+    ) {
+      throw new Error(
+        'Tracking asset access denied.'
+      );
+    }
+
+    const buffer =
+      await fs.readFile(
+        resolveTrackingAsset(
+          assetPath
+        )
+      );
+
+    return buffer.buffer.slice(
+      buffer.byteOffset,
+      buffer.byteOffset +
+        buffer.byteLength
+    );
+  }
+);
+
+ipcMain.on(
+  'workbench:publish-tracking-state',
+  (
+    event,
+    state
+  ) => {
+    if (
+      !isTrackingSender(
+        event
+      )
+    ) {
+      return;
+    }
+
+    latestTrackingState =
+      state;
+
+    if (
+      mainWindow &&
+      !mainWindow.isDestroyed()
+    ) {
+      mainWindow.webContents.send(
+        'workbench:tracking-state',
+        latestTrackingState
+      );
+    }
+  }
+);
 
 function formatHz(value) {
   if (
@@ -135,9 +356,10 @@ function formatDiagnosticsReport(
   );
 
   lines.push(
-    `NVAPI interface: ${nvapi.interfaceVersion ||
-    nvapi.interfaceStatus ||
-    'unknown'
+    `NVAPI interface: ${
+      nvapi.interfaceVersion ||
+      nvapi.interfaceStatus ||
+      'unknown'
     }`
   );
 
@@ -192,9 +414,11 @@ function formatDiagnosticsReport(
     );
 
     lines.push(
-      `  DXGI stereo modes: ${output.stereoModeCount || 0
-      } | query: ${output.stereoQueryStatus ||
-      'unknown'
+      `  DXGI stereo modes: ${
+        output.stereoModeCount || 0
+      } | query: ${
+        output.stereoQueryStatus ||
+        'unknown'
       }`
     );
 
@@ -226,8 +450,9 @@ function formatDiagnosticsReport(
       modesToPrint.length
     ) {
       lines.push(
-        `    ... ${stereoModes.length -
-        modesToPrint.length
+        `    ... ${
+          stereoModes.length -
+          modesToPrint.length
         } more`
       );
     }
@@ -286,6 +511,8 @@ function createPreviewWindow() {
       backgroundColor: '#000000',
 
       webPreferences: {
+        preload:
+          getWorkbenchPreloadPath(),
         contextIsolation: true,
         nodeIntegration: false,
         sandbox: true,
@@ -355,6 +582,8 @@ function createOffscreenWindow() {
       enableLargerThanScreen: true,
 
       webPreferences: {
+        preload:
+          getWorkbenchPreloadPath(),
         contextIsolation: true,
         nodeIntegration: false,
         sandbox: true,
@@ -457,7 +686,7 @@ function createOffscreenWindow() {
           isDiagnostics &&
           !diagnosticsPrinted &&
           result.frameCount >=
-          DIAGNOSTICS_SAMPLE_FRAMES
+            DIAGNOSTICS_SAMPLE_FRAMES
         ) {
           const systemDiagnostics =
             stereoPresenter.getSystemDiagnostics();
@@ -482,7 +711,7 @@ function createOffscreenWindow() {
         if (
           !isDiagnostics &&
           result.frameCount % 300 ===
-          0
+            0
         ) {
           const stats =
             stereoPresenter.getStats();
@@ -524,12 +753,114 @@ function createOffscreenWindow() {
   );
 }
 
+function configureTrackingSession() {
+  const trackingSession =
+    trackingWindow.webContents.session;
+
+  trackingSession.setPermissionCheckHandler(
+    (
+      webContents,
+      permission
+    ) => {
+      return (
+        permission === 'media' &&
+        Boolean(webContents) &&
+        webContents ===
+          trackingWindow?.webContents
+      );
+    }
+  );
+
+  trackingSession.setPermissionRequestHandler(
+    (
+      webContents,
+      permission,
+      callback
+    ) => {
+      callback(
+        permission === 'media' &&
+        webContents ===
+          trackingWindow?.webContents
+      );
+    }
+  );
+
+  /*
+   * The tracking renderer is deliberately offline.
+   *
+   * All runtime resources are supplied from the packaged Workbench files.
+   * This does not affect the main viewer session, which may later load a
+   * remote application.
+   */
+  trackingSession.webRequest.onBeforeRequest(
+    {
+      urls: [
+        'http://*/*',
+        'https://*/*'
+      ]
+    },
+    (
+      _details,
+      callback
+    ) => {
+      callback({
+        cancel: true
+      });
+    }
+  );
+}
+
+function createTrackingWindow() {
+  const debugConfig =
+    WORKBENCH_CONFIG.tracking.debugWindow;
+
+  trackingWindow =
+    new BrowserWindow({
+      width:
+        debugConfig.widthPx,
+      height:
+        debugConfig.heightPx,
+      show: true,
+      autoHideMenuBar: true,
+      backgroundColor: '#111111',
+
+      webPreferences: {
+        preload:
+          getTrackingPreloadPath(),
+        partition:
+          'workbench-tracking',
+        contextIsolation: true,
+        nodeIntegration: false,
+        sandbox: true,
+        backgroundThrottling: false
+      }
+    });
+
+  configureTrackingSession();
+
+  trackingWindow.on(
+    'closed',
+    () => {
+      trackingWindow =
+        null;
+    }
+  );
+
+  trackingWindow.loadFile(
+    getTrackingDebugPath()
+  );
+}
+
 app.whenReady().then(
   () => {
     if (isOffscreen) {
       createOffscreenWindow();
     } else {
       createPreviewWindow();
+    }
+
+    if (isTrackingDebug) {
+      createTrackingWindow();
     }
   }
 );
